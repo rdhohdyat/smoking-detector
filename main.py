@@ -19,6 +19,11 @@ from datetime import datetime
 import time
 import uuid
 import threading
+import os
+# pyrefly: ignore [missing-import]
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -41,7 +46,7 @@ app.add_middleware(
 
 model = YOLO("best.pt")
 
-BOT_TOKEN = "8852368840:AAH6KUjJDOfVD-eh_t7GjER8RtAu6GkHaf8"
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
 ALERT_COOLDOWN = 10
 
