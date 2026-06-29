@@ -3,6 +3,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 # pyrefly: ignore [missing-import]
 from fastapi.responses import HTMLResponse, JSONResponse
 # pyrefly: ignore [missing-import]
+from fastapi.staticfiles import StaticFiles
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 # pyrefly: ignore [missing-import]
 from ultralytics import YOLO
@@ -20,21 +22,26 @@ import time
 import uuid
 import threading
 import os
-# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = FastAPI()
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+assets_dir = os.path.join(BASE_DIR, "assets")
+if os.path.isdir(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
 @app.get("/", response_class=HTMLResponse)
 async def read_welcome():
-    with open("welcome.html", "r", encoding="utf-8") as f:
+    with open(os.path.join(BASE_DIR, "welcome.html"), "r", encoding="utf-8") as f:
         return f.read()
 
-@app.get("/index.html", response_class=HTMLResponse)
+@app.get("/demo", response_class=HTMLResponse)
 async def read_index():
-    with open("index.html", "r", encoding="utf-8") as f:
+    with open(os.path.join(BASE_DIR, "index.html"), "r", encoding="utf-8") as f:
         return f.read()
 
 app.add_middleware(
@@ -44,7 +51,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model = YOLO("best.pt")
+model = YOLO(os.path.join(BASE_DIR, "best.pt"))
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
@@ -55,7 +62,6 @@ link_store: dict[str, str | None] = {}
 _polling_offset = 0
 
 def _get_bot_username() -> str:
-    """Ambil username bot dari Telegram API"""
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/getMe"
         with urllib.request.urlopen(url, timeout=10) as resp:
@@ -67,7 +73,6 @@ def _get_bot_username() -> str:
     return ""
 
 def _send_text_sync(chat_id: str, text: str):
-    """Kirim pesan teks biasa ke Telegram"""
     try:
         params = urllib.parse.urlencode({
             "chat_id": chat_id,
@@ -83,7 +88,6 @@ def _send_text_sync(chat_id: str, text: str):
         print(f"[Bot] Gagal kirim pesan: {e}")
 
 def _poll_telegram_loop():
-    """Loop polling update Telegram (berjalan di background thread)"""
     global _polling_offset
     print("[Bot] Memulai polling Telegram...")
     while True:
@@ -112,13 +116,11 @@ def _poll_telegram_loop():
                 if not chat_id:
                     continue
 
-                # Tangani perintah /start dengan kode link
                 if text.startswith("/start"):
                     parts = text.strip().split(maxsplit=1)
                     code = parts[1].strip() if len(parts) > 1 else ""
 
                     if code and code in link_store:
-                        # Hubungkan kode ini ke chat_id user
                         link_store[code] = chat_id
                         print(f"[Bot] Kode {code} berhasil dihubungkan ke chat_id {chat_id}")
                         _send_text_sync(
@@ -129,7 +131,6 @@ def _poll_telegram_loop():
                             f"_Silakan kembali ke halaman web untuk memulai deteksi._"
                         )
                     else:
-                        # Tidak ada kode / kode tidak dikenal
                         _send_text_sync(
                             chat_id,
                             f"👋 *Halo, {first_name}!*\n\n"
@@ -145,7 +146,6 @@ _polling_thread.start()
 
 @app.get("/api/generate-link")
 async def generate_link():
-    """Buat kode unik dan link Telegram untuk user baru"""
     if not BOT_TOKEN or BOT_TOKEN == "GANTI_DENGAN_TOKEN_BOT_ANDA":
         return JSONResponse(
             status_code=503,
@@ -153,7 +153,7 @@ async def generate_link():
         )
 
     code = uuid.uuid4().hex[:8].upper()
-    link_store[code] = None  # Belum terhubung
+    link_store[code] = None 
 
     bot_username = await asyncio.to_thread(_get_bot_username)
     if not bot_username:
@@ -169,14 +169,12 @@ async def generate_link():
 
 @app.get("/api/check-link/{code}")
 async def check_link(code: str):
-    """Cek apakah kode sudah dihubungkan ke chat_id Telegram"""
     if code not in link_store:
         return {"linked": False, "chat_id": None}
     chat_id = link_store[code]
     return {"linked": chat_id is not None, "chat_id": chat_id}
 
 def send_telegram_photo_sync(chat_id: str, text: str, photo_bytes: bytes):
-    """Kirim foto beserta caption ke Telegram menggunakan BOT_TOKEN server"""
     boundary = "----BotBoundary7MA4YWxkTrZu"
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
 
@@ -225,7 +223,6 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("[WS] Koneksi diterima.")
 
-    # Cooldown per-koneksi
     last_alert_time = 0
 
     try:
@@ -235,16 +232,14 @@ async def websocket_endpoint(websocket: WebSocket):
 
             img_data = payload.get("image")
             detection_active = payload.get("active", False)
-            # Kode link yang dikirim frontend untuk lookup chat_id
+
             link_code = payload.get("link_code", "")
 
             if not img_data:
                 continue
 
-            # Cari chat_id dari link_store berdasarkan kode
             chat_id = link_store.get(link_code) if link_code else None
 
-            # Decode gambar
             try:
                 header, encoded = img_data.split(",", 1)
                 img_bytes = base64.b64decode(encoded)
@@ -257,7 +252,6 @@ async def websocket_endpoint(websocket: WebSocket):
             if frame is None:
                 continue
 
-            # YOLO inference
             results = model(frame)
 
             detected_label = "no_detection"

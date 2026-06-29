@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deteksi Merokok</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet" />
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+    body {
+      font-family: "Inter", sans-serif;
+    }
+
+    .animate-pulse-recording {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+      border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    .modal-backdrop {
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .telegram-glow {
+      box-shadow: 0 0 40px rgba(41, 182, 246, 0.15), 0 0 80px rgba(41, 182, 246, 0.05);
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(24px) scale(0.97);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .modal-card {
+      animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .spin {
+      animation: spin 1s linear infinite;
+    }
+
+    /* Steps */
+    .step-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .step-done {
+      background: #059669;
+      color: white;
+    }
+
+    .step-active {
+      background: #0369a1;
+      color: white;
+    }
+
+    .step-idle {
+      background: #262626;
+      color: #737373;
+      border: 1px solid #404040;
+    }
+
+    /* Pulse dot for waiting state */
+    @keyframes pulseDot {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.4;
+        transform: scale(0.7);
+      }
+    }
+
+    .pulse-dot {
+      animation: pulseDot 1.5s ease-in-out infinite;
+    }
+
+    .tg-connected {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+
+    .tg-disconnected {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #f87171;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+  <!-- ===================== TELEGRAM CONNECT MODAL ===================== -->
+  <div id="telegramModal" class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop bg-slate-950/80">
+    <div
+      class="modal-card telegram-glow bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+      <!-- Top gradient strip -->
+      <div class="h-1 w-full bg-gradient-to-r from-sky-500 via-blue-500 to-cyan-400"></div>
+
+      <div class="p-8">
+        <!-- Header -->
+        <div class="flex flex-col items-center mb-8">
+          <div class="bg-sky-500/10 border border-sky-500/30 rounded-2xl p-4 mb-4">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.7 8c-.12.56-.44.7-.9.44l-2.5-1.84-1.2 1.16c-.13.13-.24.24-.5.24l.18-2.5 4.6-4.16c.2-.18-.04-.28-.31-.1L7.6 14.36l-2.46-.77c-.53-.17-.54-.53.11-.78l9.6-3.7c.44-.16.83.1.79.69z"
+                fill="#29B6F6" />
+            </svg>
+          </div>
+          <h2 class="text-xl font-semibold text-slate-100">Hubungkan ke Telegram</h2>
+          <p class="text-sm text-slate-400 text-center mt-1 leading-relaxed max-w-sm">
+            Ikuti langkah berikut agar Anda dapat menerima notifikasi otomatis saat aktivitas merokok terdeteksi.
+          </p>
+        </div>
+
+        <!-- Steps -->
+        <div class="space-y-4 mb-8">
+
+          <!-- STEP 1: Klik Buka Bot -->
+          <div id="step1" class="flex items-start gap-4 p-4 bg-slate-800/60 rounded-xl border border-slate-700">
+            <div id="step1Circle" class="step-circle step-active">1</div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-slate-200 mb-2">Buka bot Telegram Anda</p>
+              <button id="btnOpenBot"
+                class="bg-sky-600 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2">
+                <i class="fab fa-telegram text-base"></i>
+                <span id="btnOpenBotText">Memuat link...</span>
+              </button>
+              <p class="text-xs text-slate-500 mt-2">
+                Setelah terbuka di Telegram, tekan tombol <strong class="text-slate-300">Start</strong>.
+              </p>
+            </div>
+          </div>
+
+          <!-- STEP 2: Menunggu konfirmasi -->
+          <div id="step2"
+            class="flex items-start gap-4 p-4 bg-slate-800/40 rounded-xl border border-slate-700/50 opacity-50">
+            <div id="step2Circle" class="step-circle step-idle">2</div>
+            <div class="flex-1">
+              <p class="text-sm font-medium text-slate-300 mb-1">Tekan Start di Telegram</p>
+              <div id="step2Waiting" class="hidden flex items-center gap-2 text-xs text-amber-400">
+                <span class="inline-block w-2 h-2 rounded-full bg-amber-400 pulse-dot"></span>
+                Menunggu konfirmasi dari Telegram...
+              </div>
+              <div id="step2Done" class="hidden flex items-center gap-2 text-xs text-emerald-400">
+                <i class="fas fa-check-circle"></i>
+                Terhubung! Selamat datang di sistem deteksi.
+              </div>
+              <p id="step2Desc" class="text-xs text-slate-500 mt-1">
+                Bot akan mengonfirmasi setelah Anda menekan Start.
+              </p>
+            </div>
+          </div>
+
+          <!-- STEP 3: Siap -->
+          <div id="step3"
+            class="flex items-start gap-4 p-4 bg-slate-800/40 rounded-xl border border-slate-700/50 opacity-50">
+            <div id="step3Circle" class="step-circle step-idle">3</div>
+            <div class="flex-1">
+              <p class="text-sm font-medium text-slate-300">Siap menerima notifikasi</p>
+              <p class="text-xs text-slate-500 mt-1">Anda akan menerima foto + notifikasi setiap kali merokok
+                terdeteksi.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div id="tgError"
+          class="hidden mb-4 text-xs text-red-400 bg-red-950/40 border border-red-900/50 px-3 py-2 rounded-lg">
+          <i class="fas fa-exclamation-circle mr-1"></i>
+          <span id="tgErrorText"></span>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-3">
+          <button id="btnSkip"
+            class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 px-4 py-2.5 rounded-lg text-sm transition-all">
+            Lewati (tanpa notifikasi)
+          </button>
+          <button id="btnConnected" disabled
+            class="flex-1 bg-emerald-700 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2">
+            <i class="fas fa-check"></i> Mulai Deteksi
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ===================== END TELEGRAM MODAL ===================== -->
+
+  <!-- ===================== MAIN APP ===================== -->
+  <div class="container mx-auto py-8 px-4 max-w-6xl">
+    <header class="mb-6">
+      <div class="bg-slate-900 rounded-lg border border-slate-800 shadow-md overflow-hidden">
+        <div class="px-6 py-4">
+          <div class="flex items-center justify-between flex-wrap gap-3">
+             <div class="flex items-center">
+        <img src="assets/logo-smokedect.png" class="mr-2" height="40" width="40" alt="">
+        <span class="text-lg font-bold tracking-tight text-white">
+          Smoke<span class="text-sky-500">Dect</span>
+        </span>
+      </div>
+            <div class="flex items-center gap-3 flex-wrap">
+              <!-- Telegram status badge -->
+              <button id="telegramBadge" title="Klik untuk hubungkan ulang Telegram"
+                class="tg-disconnected flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all hover:opacity-80 cursor-pointer">
+                <i class="fab fa-telegram"></i>
+                <span id="telegramBadgeText">Telegram: Belum terhubung</span>
+              </button>
+              <!-- WS status -->
+              <div class="flex items-center space-x-2">
+                <span class="relative flex h-3 w-3">
+                  <span id="connectionStatus" class="flex h-3 w-3">
+                    <span
+                      class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                  </span>
+                </span>
+                <span id="connectionText" class="text-sm text-slate-400">Tidak terkoneksi</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="flex flex-col lg:flex-row gap-6">
+      <div class="w-full lg:w-2/3">
+        <div class="bg-slate-900 rounded-lg border border-slate-800 shadow-md overflow-hidden">
+          <div class="bg-slate-900 border-b border-slate-800 p-3 flex justify-between items-center">
+            <div class="flex items-center">
+              <span id="recordingIndicator" class="hidden h-2 w-2 rounded-full bg-red-500 mr-2"></span>
+              <span class="text-slate-200 font-medium text-sm">Live Feed</span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <span id="videoStatus"
+                class="px-2 py-1 text-xs rounded-full bg-amber-500 text-slate-900 font-medium">Menunggu</span>
+            </div>
+          </div>
+
+          <!-- Video -->
+          <div class="relative bg-slate-950 w-full h-[420px] flex items-center justify-center">
+            <img id="videoFeed" class="max-w-full max-h-full" alt="Video Feed" />
+            <div id="loadingOverlay"
+              class="absolute inset-0 flex items-center justify-center bg-slate-950 bg-opacity-80">
+              <div class="text-center">
+                <div
+                  class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-slate-400 border-r-transparent"
+                  role="status"></div>
+                <p class="mt-4 text-slate-400 text-sm">Menghubungkan ke server deteksi...</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="bg-slate-900 p-4 border-t border-slate-800">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div class="flex flex-wrap items-center gap-3">
+                <button id="startButton"
+                  class="bg-slate-800 hover:bg-slate-700 text-slate-100 px-4 py-2 rounded-md flex items-center text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-slate-700">
+                  <i class="fas fa-play mr-2 text-emerald-500"></i> Mulai
+                </button>
+                <button id="stopButton" disabled
+                  class="bg-slate-800 hover:bg-slate-700 text-slate-100 px-4 py-2 rounded-md flex items-center text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-slate-700">
+                  <i class="fas fa-stop mr-2 text-red-500"></i> Berhenti
+                </button>
+
+                <div class="flex items-center space-x-2">
+                  <label for="cameraSelect" class="text-xs text-slate-400 font-medium whitespace-nowrap">Sumber
+                    Kamera:</label>
+                  <select id="cameraSelect"
+                    class="bg-slate-800 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-md text-sm outline-none focus:border-slate-500 transition-all max-w-[200px]">
+                    <option value="">Memuat kamera...</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <span id="detectionCounter"
+                  class="hidden px-3 py-1 bg-slate-800 text-slate-200 text-sm rounded-md border border-slate-700">
+                  Deteksi: <span id="detectionCount" class="font-medium">0</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <video id="localVideo" class="absolute w-px h-px opacity-0 pointer-events-none" autoplay playsinline
+            muted></video>
+          <canvas id="localCanvas" class="absolute w-px h-px opacity-0 pointer-events-none" width="640"
+            height="480"></canvas>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div class="w-full lg:w-1/3 flex flex-col gap-6">
+        <!-- Snapshots -->
+        <div class="bg-slate-900 rounded-lg border border-slate-800 shadow-md overflow-hidden">
+          <div class="bg-slate-900 border-b border-slate-800 p-3">
+            <h2 class="text-slate-200 font-medium text-sm">Snapshots Terdeteksi</h2>
+          </div>
+          <div class="p-4 grid grid-cols-3 gap-3">
+            <div class="aspect-video bg-slate-800 rounded-md overflow-hidden border border-slate-700">
+              <img id="snapshotImage1" src="" alt="Snapshot 1"
+                class="w-full h-full object-cover opacity-0 transition-opacity duration-300 cursor-pointer" />
+            </div>
+            <div class="aspect-video bg-slate-800 rounded-md overflow-hidden border border-slate-700">
+              <img id="snapshotImage2" src="" alt="Snapshot 2"
+                class="w-full h-full object-cover opacity-0 transition-opacity duration-300 cursor-pointer" />
+            </div>
+            <div class="aspect-video bg-slate-800 rounded-md overflow-hidden border border-slate-700">
+              <img id="snapshotImage3" src="" alt="Snapshot 3"
+                class="w-full h-full object-cover opacity-0 transition-opacity duration-300 cursor-pointer" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Zoom Modal -->
+        <div id="zoomModal"
+          class="fixed inset-0 bg-slate-950 bg-opacity-80 flex justify-center items-center hidden z-50 backdrop-blur-sm">
+          <div class="bg-slate-900 p-2 rounded-lg border border-slate-700 shadow-xl max-w-2xl">
+            <img id="zoomedImage" class="max-w-full max-h-[80vh] rounded" />
+            <div class="mt-2 text-right">
+              <button id="closeModal"
+                class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1 rounded text-sm">Tutup</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detection Info -->
+        <div class="bg-slate-900 rounded-lg border border-slate-800 shadow-md overflow-hidden flex-grow">
+          <div class="bg-slate-900 border-b border-slate-800 p-3">
+            <h2 class="text-slate-200 font-medium text-sm">Informasi Deteksi</h2>
+          </div>
+          <div class="p-4">
+            <div class="mb-4">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-slate-400 text-sm">Status Deteksi:</span>
+                <span id="detectionStatus"
+                  class="px-2 py-1 bg-slate-800 text-slate-400 text-xs rounded-md border border-slate-700">Tidak
+                  Aktif</span>
+              </div>
+              <div class="w-full bg-slate-800 rounded-full h-2 border border-slate-700">
+                <div id="confidenceBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                  style="width:0%"></div>
+              </div>
+            </div>
+
+            <div class="space-y-3 mb-4">
+              <div class="flex justify-between items-center px-3 py-2 bg-slate-800 rounded-md border border-slate-700">
+                <span class="text-slate-400 text-sm">Tanggal:</span>
+                <span id="currentDate" class="text-slate-200 text-sm font-medium"></span>
+              </div>
+              <div class="flex justify-between items-center px-3 py-2 bg-slate-800 rounded-md border border-slate-700">
+                <span class="text-slate-400 text-sm">Waktu Mulai:</span>
+                <span id="startTime" class="text-slate-200 text-sm font-medium">--:--:--</span>
+              </div>
+              <div class="flex justify-between items-center px-3 py-2 bg-slate-800 rounded-md border border-slate-700">
+                <span class="text-slate-400 text-sm">Durasi:</span>
+                <span id="duration" class="text-slate-200 text-sm font-medium">00:00:00</span>
+              </div>
+            </div>
+
+            <div class="mt-4">
+              <h3 class="text-slate-400 text-sm mb-2 font-medium">Log Deteksi:</h3>
+              <div id="detectionInfo"
+                class="bg-slate-800 p-3 rounded-md text-sm text-slate-400 h-32 overflow-y-auto border border-slate-700">
+                <div class="text-slate-500 italic">Menunggu aktivitas deteksi...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =====================================================================
+    //  TELEGRAM CONNECT FLOW
+    // =====================================================================
+    const STORAGE_LINK_CODE = "smokdect_link_code";
+    const STORAGE_CHAT_ID = "smokdect_chat_id";
+
+    let myLinkCode = localStorage.getItem(STORAGE_LINK_CODE) || "";
+    let myChatId = localStorage.getItem(STORAGE_CHAT_ID) || "";
+
+    let pollInterval = null;
+
+    // --- DOM refs (modal) ---
+    const telegramModal = document.getElementById("telegramModal");
+    const btnOpenBot = document.getElementById("btnOpenBot");
+    const btnOpenBotText = document.getElementById("btnOpenBotText");
+    const btnSkip = document.getElementById("btnSkip");
+    const btnConnected = document.getElementById("btnConnected");
+    const tgError = document.getElementById("tgError");
+    const tgErrorText = document.getElementById("tgErrorText");
+
+    const step1 = document.getElementById("step1");
+    const step2 = document.getElementById("step2");
+    const step3 = document.getElementById("step3");
+    const step1Circle = document.getElementById("step1Circle");
+    const step2Circle = document.getElementById("step2Circle");
+    const step3Circle = document.getElementById("step3Circle");
+    const step2Waiting = document.getElementById("step2Waiting");
+    const step2Done = document.getElementById("step2Done");
+    const step2Desc = document.getElementById("step2Desc");
+
+    const telegramBadge = document.getElementById("telegramBadge");
+    const telegramBadgeText = document.getElementById("telegramBadgeText");
+
+    function setConnectedUI() {
+      telegramBadge.className = "tg-connected flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all hover:opacity-80 cursor-pointer";
+      telegramBadgeText.textContent = "Telegram: Terhubung ✓";
+    }
+    function setDisconnectedUI() {
+      telegramBadge.className = "tg-disconnected flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all hover:opacity-80 cursor-pointer";
+      telegramBadgeText.textContent = "Telegram: Belum terhubung";
+    }
+
+    // Cek apakah sudah terhubung sebelumnya
+    async function checkExistingSession() {
+      if (!myLinkCode) return false;
+      try {
+        const res = await fetch(`/api/check-link/${myLinkCode}`);
+        const data = await res.json();
+        if (data.linked && data.chat_id) {
+          myChatId = data.chat_id;
+          return true;
+        }
+      } catch (_) { }
+      return false;
+    }
+
+    // Minta link baru dari server
+    async function fetchNewLink() {
+      btnOpenBot.disabled = true;
+      btnOpenBotText.textContent = "Memuat link...";
+      tgError.classList.add("hidden");
+
+      try {
+        const res = await fetch("/api/generate-link");
+        const data = await res.json();
+
+        if (data.error) {
+          tgErrorText.textContent = data.error;
+          tgError.classList.remove("hidden");
+          btnOpenBotText.textContent = "Coba lagi";
+          btnOpenBot.disabled = false;
+          return;
+        }
+
+        myLinkCode = data.code;
+        localStorage.setItem(STORAGE_LINK_CODE, myLinkCode);
+
+        btnOpenBot.disabled = false;
+        btnOpenBotText.textContent = `Buka @${data.bot_username}`;
+        btnOpenBot.onclick = () => {
+          window.open(data.link, "_blank");
+          // Setelah klik, aktifkan step 2 dan mulai polling
+          activateStep2();
+        };
+      } catch (e) {
+        tgErrorText.textContent = "Gagal terhubung ke server. Pastikan server berjalan.";
+        tgError.classList.remove("hidden");
+        btnOpenBotText.textContent = "Coba lagi";
+        btnOpenBot.disabled = false;
+      }
+    }
+
+    function activateStep2() {
+      step2.classList.remove("opacity-50");
+      step2Circle.className = "step-circle step-active";
+      step2Waiting.classList.remove("hidden");
+      step2Desc.classList.add("hidden");
+
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/check-link/${myLinkCode}`);
+          const data = await res.json();
+          if (data.linked && data.chat_id) {
+            myChatId = data.chat_id;
+            localStorage.setItem(STORAGE_CHAT_ID, myChatId);
+            onTelegramConnected();
+          }
+        } catch (_) { }
+      }, 2000);
+    }
+
+    function onTelegramConnected() {
+      if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+
+      // Update step UI
+      step1Circle.className = "step-circle step-done";
+      step1Circle.innerHTML = '<i class="fas fa-check text-xs"></i>';
+
+      step2Circle.className = "step-circle step-done";
+      step2Circle.innerHTML = '<i class="fas fa-check text-xs"></i>';
+      step2Waiting.classList.add("hidden");
+      step2Done.classList.remove("hidden");
+
+      step3.classList.remove("opacity-50");
+      step3Circle.className = "step-circle step-done";
+      step3Circle.innerHTML = '<i class="fas fa-check text-xs"></i>';
+
+      // Aktifkan tombol Mulai Deteksi
+      btnConnected.disabled = false;
+
+      setConnectedUI();
+    }
+
+    // Tombol "Mulai Deteksi" di modal
+    btnConnected.addEventListener("click", () => {
+      telegramModal.classList.add("hidden");
+    });
+
+    // Tombol Lewati
+    btnSkip.addEventListener("click", () => {
+      myChatId = "";
+      myLinkCode = "";
+      telegramModal.classList.add("hidden");
+      showToast("⚠️ Berjalan tanpa notifikasi Telegram.", "warning");
+    });
+
+    // Klik badge di header → buka ulang modal
+    telegramBadge.addEventListener("click", async () => {
+      // Reset step UI
+      step1Circle.className = "step-circle step-active";
+      step1Circle.innerHTML = "1";
+      step2Circle.className = "step-circle step-idle";
+      step2Circle.innerHTML = "2";
+      step3Circle.className = "step-circle step-idle";
+      step3Circle.innerHTML = "3";
+      step2.classList.add("opacity-50");
+      step3.classList.add("opacity-50");
+      step2Waiting.classList.add("hidden");
+      step2Done.classList.add("hidden");
+      step2Desc.classList.remove("hidden");
+      btnConnected.disabled = true;
+      tgError.classList.add("hidden");
+
+      telegramModal.classList.remove("hidden");
+      await fetchNewLink();
+    });
+
+    // ===================== INIT =====================
+    (async () => {
+      // Cek sesi lama
+      const alreadyLinked = await checkExistingSession();
+      if (alreadyLinked) {
+        setConnectedUI();
+        telegramModal.classList.add("hidden");
+        showToast("✅ Telegram masih terhubung.", "success");
+      } else {
+        // Muat link baru
+        setDisconnectedUI();
+        await fetchNewLink();
+      }
+    })();
+
+    // =====================================================================
+    //  TOAST
+    // =====================================================================
+    function showToast(msg, type = "success") {
+      const old = document.getElementById("toastNotif");
+      if (old) old.remove();
+      const toast = document.createElement("div");
+      toast.id = "toastNotif";
+      const cls = type === "success"
+        ? "bg-emerald-900/90 border-emerald-700 text-emerald-200"
+        : "bg-amber-900/90 border-amber-700 text-amber-200";
+      toast.className = `fixed bottom-6 right-6 z-[100] px-5 py-3 rounded-xl border text-sm font-medium shadow-xl ${cls}`;
+      toast.style.animation = "slideUp 0.3s ease";
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transition = "opacity 0.4s";
+        setTimeout(() => toast.remove(), 400);
+      }, 3000);
+    }
+
+    // =====================================================================
+    //  DATE / TIME
+    // =====================================================================
+    document.getElementById("currentDate").textContent =
+      new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+    // =====================================================================
+    //  SNAPSHOT GALLERY
+    // =====================================================================
+    let captureCount = 0;
+    const maxCaptures = 3;
+    const snapshots = [
+      document.getElementById("snapshotImage1"),
+      document.getElementById("snapshotImage2"),
+      document.getElementById("snapshotImage3"),
+    ];
+    const zoomModal = document.getElementById("zoomModal");
+    const zoomedImage = document.getElementById("zoomedImage");
+
+    snapshots.forEach(s => {
+      s.addEventListener("click", () => {
+        if (s.src && s.src !== window.location.href) {
+          zoomedImage.src = s.src;
+          zoomModal.classList.remove("hidden");
+        }
+      });
+    });
+    document.getElementById("closeModal").addEventListener("click", () => {
+      zoomModal.classList.add("hidden"); zoomedImage.src = "";
+    });
+    zoomModal.addEventListener("click", e => {
+      if (e.target === zoomModal) { zoomModal.classList.add("hidden"); zoomedImage.src = ""; }
+    });
+
+    let lastCaptureTime = 0;
+    function captureSnapshot(imageData) {
+      const now = Date.now();
+      if (now - lastCaptureTime < 5000) return;
+      snapshots[captureCount % maxCaptures].src = imageData;
+      snapshots[captureCount % maxCaptures].classList.add("opacity-100");
+      captureCount++;
+      lastCaptureTime = now;
+    }
+
+    // =====================================================================
+    //  CORE STATE
+    // =====================================================================
+    let detectionActive = false;
+    let startTimeStamp = null;
+    let durationInterval = null;
+    let detectionCount = 0;
+
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    const videoFeed = document.getElementById("videoFeed");
+    const startButton = document.getElementById("startButton");
+    const stopButton = document.getElementById("stopButton");
+    const detectionStatus = document.getElementById("detectionStatus");
+    const connectionStatus = document.getElementById("connectionStatus");
+    const connectionText = document.getElementById("connectionText");
+    const recordingIndicator = document.getElementById("recordingIndicator");
+    const videoStatus = document.getElementById("videoStatus");
+    const detectionCounter = document.getElementById("detectionCounter");
+    const detectionCountEl = document.getElementById("detectionCount");
+
+    const cameraSelect = document.getElementById("cameraSelect");
+    const localVideo = document.getElementById("localVideo");
+    const localCanvas = document.getElementById("localCanvas");
+    const canvasCtx = localCanvas.getContext("2d");
+
+    let localStream = null;
+    let sendFramesInterval = null;
+    let isCameraActive = false;
+
+    // =====================================================================
+    //  CAMERA SETUP
+    // =====================================================================
+    async function setupCameraDevices() {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: true });
+        s.getTracks().forEach(t => t.stop());
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const vDevs = devices.filter(d => d.kind === "videoinput");
+        cameraSelect.innerHTML = "";
+        if (!vDevs.length) { cameraSelect.innerHTML = '<option value="">Tidak ada kamera</option>'; return; }
+        vDevs.forEach((d, i) => {
+          const o = document.createElement("option");
+          o.value = d.deviceId;
+          o.text = d.label || `Kamera ${i + 1}`;
+          cameraSelect.appendChild(o);
+        });
+      } catch {
+        cameraSelect.innerHTML = '<option value="">Akses kamera ditolak</option>';
+      }
+    }
+    window.addEventListener("DOMContentLoaded", () => {
+      if (navigator.mediaDevices?.getUserMedia) setupCameraDevices();
+      else cameraSelect.innerHTML = '<option value="">Browser tidak mendukung</option>';
+    });
+
+    // =====================================================================
+    //  WEBSOCKET
+    // =====================================================================
+    let backendHost = "localhost:8000";
+    if (window.location.hostname && window.location.hostname !== "" && window.location.protocol !== "file:") {
+      backendHost = window.location.host;
+    }
+    const wsUrl = (window.location.protocol === "https:" ? "wss://" : "ws://") + backendHost + "/ws";
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = event => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.image) videoFeed.src = data.image;
+        if (detectionActive && data.type === "detection") {
+          if (data.label === "smoking" && data.confidence > 80) {
+            captureSnapshot(data.image);
+            updateDetectionInfo("Terdeteksi merokok pada " + new Date().toLocaleTimeString());
+            detectionCount++;
+            updateConfidenceBar(data.confidence);
+            detectionCountEl.textContent = detectionCount;
+          } else {
+            updateConfidenceBar(0);
+          }
+        }
+      } catch (e) { console.error(e); }
+    };
+
+    ws.onopen = () => {
+      startButton.disabled = false;
+      updateConnectionStatus(true);
+      loadingOverlay.style.display = "none";
+    };
+    ws.onclose = () => {
+      startButton.disabled = true;
+      stopButton.disabled = true;
+      updateConnectionStatus(false);
+      if (detectionActive) stopDetection();
+      setTimeout(() => {
+        loadingOverlay.style.display = "flex";
+        loadingOverlay.querySelector("p").textContent = "Mencoba menghubungkan kembali...";
+      }, 5000);
+    };
+    ws.onerror = () => updateConnectionStatus(false);
+
+    function updateConnectionStatus(connected) {
+      connectionStatus.innerHTML = connected
+        ? `<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+             <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>`
+        : `<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+             <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>`;
+      connectionText.textContent = connected ? "Terhubung" : "Tidak terhubung";
+      connectionText.className = connected ? "text-sm text-emerald-400" : "text-sm text-slate-400";
+    }
+
+    function updateConfidenceBar(pct) {
+      const bar = document.getElementById("confidenceBar");
+      bar.style.width = `${pct}%`;
+      bar.className = `${pct > 80 ? "bg-red-500" : pct > 50 ? "bg-amber-500" : "bg-blue-500"} h-2 rounded-full transition-all duration-300 ease-out`;
+    }
+
+    function updateDetectionInfo(msg) {
+      const el = document.getElementById("detectionInfo");
+      if (el.querySelector(".italic")) el.innerHTML = "";
+      const d = document.createElement("div");
+      d.className = "mb-1 py-1 border-b border-slate-700 last:border-0";
+      d.textContent = msg;
+      el.appendChild(d);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    // =====================================================================
+    //  SEND FRAME — kirim link_code (bukan token!) ke backend
+    // =====================================================================
+    function sendFrameToServer() {
+      if (!detectionActive || !isCameraActive) return;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        canvasCtx.drawImage(localVideo, 0, 0, localCanvas.width, localCanvas.height);
+        const imageData = localCanvas.toDataURL("image/jpeg", 0.6);
+        ws.send(JSON.stringify({
+          image: imageData,
+          active: true,
+          link_code: myLinkCode   // ← backend lookup chat_id dari kode ini
+        }));
+      }
+    }
+
+    // =====================================================================
+    //  START / STOP
+    // =====================================================================
+    async function startDetection() {
+      if (detectionActive) return;
+      const deviceId = cameraSelect.value;
+      if (!deviceId) { alert("Silakan pilih kamera terlebih dahulu!"); return; }
+
+      if (!myChatId) {
+        const go = confirm("⚠️ Telegram belum terhubung!\n\nAnda tidak akan menerima notifikasi. Lanjutkan?");
+        if (!go) { telegramBadge.click(); return; }
+      }
+
+      loadingOverlay.style.display = "flex";
+      loadingOverlay.querySelector("p").textContent = "Mengaktifkan kamera...";
+
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
+        });
+        localVideo.srcObject = localStream;
+        isCameraActive = true;
+
+        localVideo.onloadedmetadata = () => {
+          localVideo.play();
+          loadingOverlay.style.display = "none";
+          detectionActive = true;
+          startButton.disabled = true;
+          stopButton.disabled = false;
+          cameraSelect.disabled = true;
+
+          detectionStatus.textContent = "Aktif";
+          detectionStatus.className = "px-2 py-1 bg-emerald-950 text-emerald-400 text-xs rounded-md border border-emerald-800";
+          recordingIndicator.classList.remove("hidden");
+          recordingIndicator.classList.add("animate-pulse-recording");
+          videoStatus.textContent = "Mendeteksi";
+          videoStatus.className = "px-2 py-1 text-xs rounded-full bg-emerald-500 text-slate-900 font-medium";
+          detectionCounter.classList.remove("hidden");
+
+          startTimeStamp = new Date();
+          document.getElementById("startTime").textContent = startTimeStamp.toLocaleTimeString();
+          durationInterval = setInterval(updateDuration, 1000);
+          sendFramesInterval = setInterval(sendFrameToServer, 200);
+
+          updateDetectionInfo("Deteksi dimulai pada " + startTimeStamp.toLocaleTimeString());
+        };
+      } catch (err) {
+        loadingOverlay.style.display = "none";
+        alert("Gagal mengakses kamera: " + err.message);
+      }
+    }
+
+    function stopDetection() {
+      if (!detectionActive) return;
+      detectionActive = false;
+      startButton.disabled = false;
+      stopButton.disabled = true;
+      cameraSelect.disabled = false;
+
+      detectionStatus.textContent = "Tidak Aktif";
+      detectionStatus.className = "px-2 py-1 bg-slate-800 text-slate-400 text-xs rounded-md border border-slate-700";
+      recordingIndicator.classList.add("hidden");
+      recordingIndicator.classList.remove("animate-pulse-recording");
+      videoStatus.textContent = "Siap";
+      videoStatus.className = "px-2 py-1 text-xs rounded-full bg-blue-500 text-slate-900 font-medium";
+
+      if (sendFramesInterval) { clearInterval(sendFramesInterval); sendFramesInterval = null; }
+      if (durationInterval) { clearInterval(durationInterval); durationInterval = null; }
+      if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+      isCameraActive = false;
+      localVideo.srcObject = null;
+      videoFeed.src = "";
+
+      updateDetectionInfo("Deteksi dihentikan pada " + new Date().toLocaleTimeString());
+    }
+
+    function updateDuration() {
+      if (!startTimeStamp) return;
+      const d = new Date() - startTimeStamp;
+      const h = Math.floor(d / 3600000).toString().padStart(2, "0");
+      const m = Math.floor((d % 3600000) / 60000).toString().padStart(2, "0");
+      const s = Math.floor((d % 60000) / 1000).toString().padStart(2, "0");
+      document.getElementById("duration").textContent = `${h}:${m}:${s}`;
+    }
+
+    startButton.addEventListener("click", startDetection);
+    stopButton.addEventListener("click", stopDetection);
+  </script>
+</body>
+
+</html>
