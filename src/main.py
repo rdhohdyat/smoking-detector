@@ -252,7 +252,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if frame is None:
                 continue
 
-            results = model(frame)
+            results = await asyncio.to_thread(model, frame)
 
             detected_label = "no_detection"
             confidence = 0.0
